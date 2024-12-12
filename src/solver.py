@@ -7,7 +7,9 @@ from typing import Dict, List, Callable, Tuple
 import numpy as np
 import scipy
 from scipy import stats
-
+from matplotlib.ticker import MaxNLocator
+from matplotlib import pyplot as plt
+from typing import Tuple
 
 class Solver:
 
@@ -25,8 +27,12 @@ class Solver:
     def solve_integer(self):
         pass
 
-    def _sample_with_params(self, params:List[float], num_shots:int=1000) -> List[Dict[str, float]]:
-        job = self.sampler.run([(self.circuit, self._gen_param_dict(params))], shots=num_shots)
+    def _sample_with_params(
+        self, params: List[float], num_shots: int = 1000, num_layers=1
+    ) -> List[Dict[str, float]]:
+        job = self.sampler.run(
+            [(self.circuit, self._gen_param_dict(params))], shots=num_shots
+        )
         result = job.result()
         parsed_results = []
 
@@ -45,17 +51,15 @@ class Solver:
 
         return [int(chunk, 2) for chunk in parts]
 
-    def _gen_param_dict(self, params:List[float]) -> Dict[str, float]:
+    def _gen_param_dict(self, params: List[float]) -> Dict[str, float]:
         new_dict = {}
         for idx, param in enumerate(params):
-            new_dict[f"params_param_{idx}"] = param
+            new_dict[f"params_param_{idx}"] = float(param)
 
         return new_dict
 
-    def get_costs(
-        self, params, cost_function: Callable, num_shots:int
-    ) -> float:
-        parsed_results = self._sample_with_params( params, num_shots=num_shots)
+    def get_costs(self, params, cost_function: Callable, num_shots: int) -> float:
+        parsed_results = self._sample_with_params(params, num_shots=num_shots)
 
         counts = np.vectorize(lambda result: result["counts"])(parsed_results)
         costs = np.vectorize(lambda result: cost_function(result["values"]))(
@@ -104,24 +108,35 @@ class Solver:
         )
 
     def get_results_and_print(
-        self, final_params, cost_function: callable = None, num_shots=1000
+        self, final_params, cost_function: callable = None, num_shots=1000, print=True
     ) -> List[int]:
-        res = self._sample_with_params(final_params,num_shots=num_shots)
-        
+        res = self._sample_with_params(final_params, num_shots=num_shots)
+
         top_results = []
-        
+
         sorted_counts = sorted(
             res, key=lambda pc: self._cost_integer_inference(pc["values"])
         )
         for sampled in sorted_counts[0:10]:
-            top_results.append(sampled['values'])
-            print(
-                f"solution={sampled['values']} probability={sampled['counts']/num_shots} cost={self._cost_integer_inference(sampled['values'])}"
-            )
-            
+            top_results.append(sampled["values"])
+            if print:
+                print(
+                    f"solution={sampled['values']} probability={sampled['counts']/num_shots} cost={self._cost_integer_inference(sampled['values'])}"
+                )
+
         return top_results
-    
-    def get_p_value(self, best_results:List[float]) -> float:
+
+    def get_p_t_value(self, best_results: List[float]):
         sol, cov = self.qu_unfolder.solve_gurobi_integer()
         t_stat, p_value = stats.ttest_ind(best_results[0], sol)
-        return p_value
+        return p_value, t_stat
+    
+    def plot_convergence(self, p:float=None):
+        fig, axes = plt.subplots(nrows=1, ncols=1)
+        axes.plot(self.cost_values)
+        axes.set_xlabel("Iterations")
+        axes.set_ylabel("Cost")
+        axes.set_title(f"Cost convergence, iters: {len(self.cost_values)} p={p}")
+        axes.xaxis.set_major_locator(MaxNLocator(integer=True))
+        plt.savefig(f'my_plot-{p}.png')
+        plt.show()

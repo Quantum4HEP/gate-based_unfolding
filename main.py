@@ -8,7 +8,7 @@ from src.benchmark import (
     CustomDecoder,
     plot_results,
 )
-from src.solvers import ClassiqSolver
+from src.solvers import ClassiqSolver, QiskitSolver
 from qiskit.transpiler import CouplingMap
 import json
 import numpy as np
@@ -22,7 +22,7 @@ from qunfold import QUnfolder
 
 problem_params = {
     "num_entries": 70,
-    "num_bins": 5,
+    "num_bins": 4,
     "pdf_data": np.random.normal,
     "pdf_data_params": (0.0, 4.2),
     "pdf_smear": np.random.normal,
@@ -34,18 +34,48 @@ problem_params = {
 x, d, R, binning = generate_problem_instance(problem_params, seed=1)
 qu_unfolder = QUnfolder(response=R, measured=d,binning=binning,lam=0)
 
-classiqSolver = ClassiqSolver(qu_unfoler=qu_unfolder)
-result = classiqSolver.solve_integer(num_layers=3, num_shots=10000)
-results = classiqSolver.get_results_and_print(result, num_shots=10000)
+average_p = []
+average_t = []
 
-p = classiqSolver.get_p_value(results)
-print(p)
+for i in range(5):
+    qiskit = QiskitSolver(qu_unfoler=qu_unfolder)
+    result = qiskit.solve_integer(num_layers=2, num_shots=1500)
+    results = qiskit.get_results_and_print(result, num_shots=1500, print=False)
+    print(results[0])
+    sol, cov = qu_unfolder.solve_gurobi_integer()
+    print(sol)
+    
+    p, t = qiskit.get_p_t_value(results)
+    average_p.append(p)
+    average_t.append(t)
+    print(f"qiskit p={p}, t={t}")
+    
+print(f"qiskit average p={sum(average_p)/len(average_p)}, t={sum(average_t)/len(average_t)}")
+
+average_t = []
+average_p = []
+
+for _ in range(5):
+    classiq = ClassiqSolver(qu_unfoler=qu_unfolder)
+    result = classiq.solve_integer(num_layers=2, num_shots=1500)
+    results = classiq.get_results_and_print(result, num_shots=1500, print=False)
+    print(results[0])
+    sol, cov = qu_unfolder.solve_gurobi_integer()
+    print(sol)
+
+    p, t = classiq.get_p_t_value(results)
+    average_p.append(p)
+    average_t.append(t)
+    print(f"calssiq p={p}, t={t}")
+    
+print(f"classiq average p={sum(average_p)/len(average_p)}, t={sum(average_t)/len(average_t)}")
+    
 
 ###############
 # A Quick test to see the size of the problem
 ###############
 
-# problems = generete_problem_list(nr_of_problems=8,max_entries=1000)
+# problems = generete_problem_list(nr_of_problems=3,max_entries=500)
 
 # iqm_gates = ["cz",'rx','r', "measure"]
 # ibm_gates = ["cz", "id", "rx", "rz", "rzz", "sx", "x"]
@@ -88,7 +118,7 @@ print(p)
 
 # benchmarks = benchmarks_qiskit + benchmarks_classiq
 
-# plot_results(benchmarks, ["qiskit"], ["generic", "ibm"])
+# plot_results(benchmarks, ["qiskit","classiq"], ["generic", "ibm","iqm"])
 
 # with open('data.json','w') as file:
 #     json.dump(benchmarks, file, cls=CustomEncoder, indent=4)

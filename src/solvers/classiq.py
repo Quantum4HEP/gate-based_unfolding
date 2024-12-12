@@ -13,12 +13,12 @@ class ClassiqSolver(Solver):
         super().__init__(qu_unfoler, solver_options)
         self.Q = self.qu_unfolder._get_qubo_matrix().tolist()
 
-    def solve_binary(self):
+    def solve_binary(self) -> List[float]:
         qprog = self._create_qprog_binary()
         transpiled_circ = get_transpiled_circuit_from_qasm(qprog.qasm)
         return super().solve_binary()
 
-    def solve_integer(self, num_shots=1000, num_layers=1):
+    def solve_integer(self, num_shots=1000, num_layers=1) -> List[float]:
         qprog = self._create_qprog_integer(num_layers=num_layers)
         transpiled_circ = get_transpiled_circuit_from_qasm(qasm=qprog.qasm)
         self.circuit = transpiled_circ
