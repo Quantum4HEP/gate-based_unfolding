@@ -1,0 +1,5 @@
+QUnfold[gurobi]
+classiq == 0.60.1
+qiskit == 1.3.0
+qiskit_aer
+qiskit_optimization
