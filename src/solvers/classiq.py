@@ -18,14 +18,14 @@ class ClassiqSolver(Solver):
         transpiled_circ = get_transpiled_circuit_from_qasm(qprog.qasm)
         return super().solve_binary()
 
-    def solve_integer(self, num_shots=1000, num_layers=1) -> List[float]:
+    def solve_integer(self, num_shots=1000, num_layers=1) -> Dict[List[float],List[float]]:
         qprog = self._create_qprog_integer(num_layers=num_layers)
         transpiled_circ = get_transpiled_circuit_from_qasm(qasm=qprog.qasm)
         self.circuit = transpiled_circ
-        final_params = self._execute_circ(
+        final_params, cost = self._execute_circ(
             self._cost_integer, num_layers=num_layers, num_shots=num_shots
         )
-        return final_params
+        return final_params, cost
 
     # This function will return this objective function: (R @ x - d) @ (R @ x - d)
     def _cost_integer(self, x: list[int]) -> int:

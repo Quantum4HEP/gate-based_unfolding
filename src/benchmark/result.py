@@ -6,7 +6,12 @@ class Problem:
     def __init__(self, num_entries=0, num_bins=0):
         self.num_entries = num_entries
         self.num_bins = num_bins
-        
+
+    def __str__(self):
+        lines = [self.__class__.__name__ + ":"]
+        for key, val in vars(self).items():
+            lines += "{}: {}".format(key, val).split("\n")
+        return "\n    ".join(lines)
 
 
 class TranspiledResults:
@@ -25,21 +30,26 @@ class TranspiledResults:
         self.hardware_target = hardware_target
         self.additional_info = additional_info
         self.ops_count = ops_count
-        self.type = 'TranspiledResults'
-        self.type = 'Result'
-        
+        self.type = "TranspiledResults"
+        self.type = "Result"
+
+    def __str__(self):
+        lines = [self.__class__.__name__ + ":"]
+        for key, val in vars(self).items():
+            lines += "{}: {}".format(key, val).split("\n")
+        return "\n    ".join(lines)
 
 
 class Result:
     def __init__(
         self,
         circuit_creationMode="",
-        transpliedCircuits: List[TranspiledResults]=None,
+        transpliedCircuits: List[TranspiledResults] = None,
         cx_count=0,
         QAOA_type="",
         QAOA_layers=1,
         width=0,
-        problem:Problem=None,
+        problem: Problem = None,
     ):
         if transpliedCircuits is None:
             transpliedCircuits = []
@@ -52,33 +62,69 @@ class Result:
         self.QAOA_layers = QAOA_layers
         self.width = width
         self.problem = problem
-        
 
-    def __str__(self) -> str:
-        print_string = f"""
-Result: 
-    cicruit created with: {self.circuit_creationMode}
-    QAOA type: {self.QAOA_type}
-    QAOA layers: {self.QAOA_layers}
-    cx count: {self.cx_count}
-    width: {self.width}
-Problem:
-    number of entries: {self.problem.num_entries}
-    number of bins: {self.problem.num_bins}
-Transpiled cicuits: 
-"""
-        for transpiledResult in self.transpliedCircuits:
-            print_string = (
-                print_string
-                + f""" 
-Transpiler name: {transpiledResult.transpiler_name}
-    Depth: {transpiledResult.transpiled_depth}
-    additional info: { transpiledResult.additional_info}
-    hardware targe: { transpiledResult.hardware_target}
-            """
-            )
+    def __str__(self):
+        lines = [self.__class__.__name__ + ":"]
+        for key, val in vars(self).items():
+            if type(val) == list:
+                for key_nested, val_nested in enumerate(val):
+                    lines += "{}: {}".format(key_nested, val_nested).split("\n")
+            else:
+                lines += "{}: {}".format(key, val).split("\n")
+        return "\n    ".join(lines)
 
-        return print_string
+
+class SolverRun:
+    def __init__(self):
+
+        self.p: float
+        self.t: float
+        self.chi_squared_statistic: float
+        self.chi_squared_p: float
+        self.solver_result: List[int]
+        self.perfect_result: List[int]
+        self.absolute_difference: int
+        self.solver_final_params: List[float]
+        self.solver_costs: List[float]
+
+    def __str__(self):
+        lines = [self.__class__.__name__ + ":"]
+        for key, val in vars(self).items():
+            lines += "{}: {}".format(key, val).split("\n")
+        return "\n    ".join(lines)
+
+
+class SolverResults:
+    def __init__(
+        self,
+        problem: Problem = None,
+        solver: str = None,
+        iterations: int = 1,
+        num_bits: int = 0,
+        layers: int = 1,
+        shots: int = 1000,
+    ):
+        if problem is None:
+            problem = Problem()
+        self.problem = problem
+        self.solver = solver
+        self.iterations = iterations
+        self.num_bits: int = num_bits
+        self.solverRuns: List[SolverRun] = []
+        self.layers = layers
+        self.shots = shots
+        self.avg_abs_difference: float = 0
+        self.avg_itirations: float = 0
+
+    def __str__(self):
+        lines = [self.__class__.__name__ + ":"]
+        for key, val in vars(self).items():
+            if type(val) == list:
+                for key_nested, val_nested in enumerate(val):
+                    lines += "{}: {}".format(key_nested, val_nested).split("\n")
+            else:
+                lines += "{}: {}".format(key, val).split("\n")
+        return "\n    ".join(lines)
 
 
 class CustomEncoder(json.JSONEncoder):
@@ -86,17 +132,3 @@ class CustomEncoder(json.JSONEncoder):
         if isinstance(obj, (Problem, TranspiledResults, Result)):
             return obj.__dict__
         return super().default(obj)
-
-class CustomDecoder(json.JSONDecoder):
-    def __init__(self, *args, **kwargs):
-        super().__init__(object_hook=self.object_hook, *args, **kwargs)
-
-    def object_hook(self, obj):
-        if 'type' in obj:
-            if obj['type'] == 'Problem':
-                return Problem.from_dict(obj)
-            elif obj['type'] == 'TranspiledResults':
-                return TranspiledResults.from_dict(obj)
-            elif obj['type'] == 'Result':
-                return Result.from_dict(obj)
-        return obj

@@ -6,12 +6,19 @@ from qiskit_optimization.converters import QuadraticProgramToQubo
 from qiskit.circuit.library import qaoa_ansatz
 from qiskit import QuantumCircuit
 from qiskit.circuit import Parameter
+import numpy as np
 
 from .transpiler import *
 
 
 class QiskitSolver(Solver):
     def __init__(self, qu_unfoler: QUnfolder, solver_options: object = ...) -> None:
+        """_summary_
+
+        Args:
+            qu_unfoler (QUnfolder): Qunfolder instance that needs to be solved
+            solver_options (object, optional): Various solver options
+        """
         super().__init__(qu_unfoler, solver_options)
 
     def solve_binary(self, num_layers=1, num_shots=1000):
@@ -20,6 +27,7 @@ class QiskitSolver(Solver):
         cric = self._create_qaoa_binary(self)
         circ = self._update_param_names(circ)
         traspiled_circ = get_transpiled_circuit_from_quantumProgram(circ)
+        self.circuit = traspiled_circ
         final_params = self._execute_circ(
             self._cost_integer, num_layers=num_layers, num_shots=num_shots
         )
@@ -30,10 +38,10 @@ class QiskitSolver(Solver):
         circ = self._update_param_names(circ)
         traspiled_circ = get_transpiled_circuit_from_quantumProgram(circ)
         self.circuit = traspiled_circ
-        final_params = self._execute_circ(
+        final_params, cost = self._execute_circ(
             self._cost_integer, num_layers=num_layers, num_shots=num_shots
         )
-        return final_params
+        return final_params, cost
 
     # This function will return this objective function: (R @ x - d) @ (R @ x - d)
     def _cost_integer(self, x: list[int]) -> int:
@@ -67,7 +75,9 @@ class QiskitSolver(Solver):
         ]
         return sum([step1[i] * v[i] for i in range(len(step1))])
 
-    def _create_quantumcricuit_integer(self, num_layers=1) -> QuantumCircuit:
+    def _create_quantumcricuit_integer(
+        self, num_layers=1, warm_start=False
+    ) -> QuantumCircuit:
         model = gurobipy.Model()
         vtype = gurobipy.GRB.INTEGER
         sense = gurobipy.GRB.MINIMIZE
@@ -86,8 +96,29 @@ class QiskitSolver(Solver):
         mod = conv.convert(qp)
         op, offset = mod.to_ising()
 
-        ansatz = qaoa_ansatz(op, reps=num_layers, insert_barriers=True, flatten=True)
+        if not warm_start:
+            ansatz = qaoa_ansatz(op, reps=num_layers, insert_barriers=True, flatten=True)
+        else:
+            for idx, value in enumerate(self.q_unfold.d):
+                str_value = format(value, f'0{self.q_unfold.num_bits[idx]}b')
+                ws_bit_array.extend(list(str_value))
 
+            ws_bit_array = [int(element) for element in ws_bit_array]
+
+            ws_bit_array_angles = [2 * np.arcsin(np.sqrt(element)) for element in ws_bit_array]
+            
+            inital_state_qc = QuantumCircuit(op.num_qubits)
+            for i in range(op.num_qubits):
+                inital_state_qc.h(i)
+                inital_state_qc.rx(ws_bit_array_angles[i], i)
+                
+            mixer_layer_qc = QuantumCircuit(op.num_qubits)
+            for i in range(op.num_qubits):
+                mixer_layer_qc.ry(-ws_bit_array_angles[i],i)
+                mixer_layer_qc.rz(-2 * Parameter(), i)
+                mixer_layer_qc.ry(ws_bit_array_angles[i],i)
+            
+            ansatz = qaoa_ansatz(op, reps=num_layers, insert_barriers=True, flatten=True, initial_state=inital_state_qc, mixer_operator=mixer_layer_qc)
         return ansatz
 
     def _create_qaoa_binary(self, num_layers=1) -> QuantumCircuit:

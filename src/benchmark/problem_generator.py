@@ -2,7 +2,7 @@ import numpy as np
 from sklearn.preprocessing import KBinsDiscretizer
 from qunfold.utils import normalize_response
 from qunfold import QUnfolder
-from typing import List
+from typing import List, Dict
 
 
 def generate_problem_instance(problem_params, seed):
@@ -48,7 +48,7 @@ def _evenly_spaced_numbers(x, y, i):
 
 def generete_problem_list(
     nr_of_problems=4, min_bins=4, max_bins=8, min_entries=20, max_entries=200, seed=1
-)-> List[QUnfolder]:
+)-> List[Dict]:
     bins = _evenly_spaced_numbers(min_bins, max_bins, nr_of_problems)
     entries = _evenly_spaced_numbers(min_entries, max_entries, nr_of_problems)
 
@@ -64,6 +64,7 @@ def generete_problem_list(
             "pdf_smear_params": (-0.55, 0.49),
             "efficiency": 0.85,
         }
+        
         
         problems.append(problem_params)
         
